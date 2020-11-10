@@ -2,89 +2,91 @@
 import numpy as np
 import lmdb
 import random
-import caffe_pb2
-
-CROP_SIZE = 128
-CROP_CHANNELS = 1
-
-g_lmdb_env = None
-g_lmdb_txn = None
-g_lmdb_cursor = None
-
-g_rand_generator = random
-g_flip_enable = True
-g_tf_input_enable = True
-g_tf_input_scale = 0.00390625
+import cv2
+from datasets import caffe_pb2
 
 
-def set_lmdb_info(path):
-    g_lmdb_env = lmdb.open(path, readonly=True)
-    g_lmdb_txn = g_lmdb_env.begin()
-    g_lmdb_cursor = g_lmdb_txn.cursor()
+class LMDB():
+    def __init__(self):
+        self.CROP_SIZE = 128
+        self.CROP_CHANNELS = 1
 
-    key = g_lmdb_cursor.key()
-    lmdb_size = 0
-    while len(key) != 0:
-        lmdb_size += 1
-        key = g_lmdb_cursor.key()
-        g_lmdb_cursor.next()
+        self.g_lmdb_env = None
+        self.g_lmdb_txn = None
+        self.g_lmdb_cursor = None
 
-    return lmdb_size
+        self.g_rand_generator = random
+        self.g_flip_enable = True
+        self.g_tf_input_enable = True
+        self.g_tf_input_scale = 0.00390625
 
+    def set_lmdb_info(self, path):
+        self.g_lmdb_env = lmdb.open(path, readonly=True)
+        self.g_lmdb_txn = self.g_lmdb_env.begin()
+        self.g_lmdb_cursor = self.g_lmdb_txn.cursor()
 
-def load_lmdb_on_batch(batch_idx, batch_size):
-    """Returns the i-th example."""
+        self.g_lmdb_cursor.first()
+        lmdb_size = 0
+        while len(self.g_lmdb_cursor.key()) != 0:
+            lmdb_size += 1
+            self.g_lmdb_cursor.next()
 
-    st = batch_idx * batch_size
-    en = (batch_idx + 1) * batch_size
-    st_en = en - st
+        return lmdb_size
 
-    # if en > self.db_size:
-    #     en = self.db_size
+    def load_lmdb_on_batch(self, batch_idx, batch_size):
+        """Returns the i-th example."""
 
-    crop_size = CROP_SIZE
+        st = batch_idx * batch_size
+        en = (batch_idx + 1) * batch_size
+        st_en = en - st
 
-    batchX = np.empty((st_en, CROP_SIZE, CROP_SIZE, CROP_CHANNELS), dtype=np.float32)
-    batchY = np.empty((st_en), dtype=int)
+        # if en > self.db_size:
+        #     en = self.db_size
 
-    for i in range(st_en):
-        key = g_lmdb_cursor.key()
+        crop_size = self.CROP_SIZE
 
+        batchX = np.empty((st_en, self.CROP_SIZE, self.CROP_SIZE, self.CROP_CHANNELS), dtype=np.float32)
+        batchY = np.empty((st_en), dtype=int)
+        if len(self.g_lmdb_cursor.key()) == 0:
+            self.g_lmdb_cursor.first()
 
-        datum = caffe_pb2.Datum()
-        datum.ParseFromString(g_lmdb_cursor.value())
+        for i in range(st_en):
+            if len(self.g_lmdb_cursor.key()) == 0:
+                self.g_lmdb_cursor.first()
 
-        w = datum.width
-        h = datum.height
-        c = datum.channels
-        y = datum.label
+            datum = caffe_pb2.Datum()
+            datum.ParseFromString(self.g_lmdb_cursor.value())
 
-        assert (c == CROP_CHANNELS), "must equal channels."
+            w = datum.width
+            h = datum.height
+            c = datum.channels
+            y = datum.label
 
-        xint8 = np.fromstring(datum.data, dtype=np.int8)
-        xint8 = xint8.reshape(c, h, w)
+            assert (c == self.CROP_CHANNELS), "must equal channels."
 
-        if g_rand_generator:
-            top = random.randint(0, h - crop_size - 1)
-            left = random.randint(0, w - crop_size - 1)
-        else:
-            top = (h - crop_size) // 2
-            left = (w - crop_size) // 2
+            xint8 = np.fromstring(datum.data, dtype=np.uint8)
+            xint8 = xint8.reshape(c, h, w)
 
-        bottom = top + crop_size
-        right = left + crop_size
-        xint8 = xint8[:, top:bottom, left:right]
+            if self.g_rand_generator:
+                top = random.randint(0, h - crop_size - 1)
+                left = random.randint(0, w - crop_size - 1)
+            else:
+                top = (h - crop_size) // 2
+                left = (w - crop_size) // 2
 
-        if g_flip_enable:
-            if random.randint(0, 1):
-                xint8 = xint8[:, :, ::-1]
+            bottom = top + crop_size
+            right = left + crop_size
+            xint8 = xint8[:, top:bottom, left:right]
 
-        if g_tf_input_enable:
-            xint8.transpose(1, 2, 0)
+            if self.g_flip_enable:
+                if random.randint(0, 1):
+                    xint8 = xint8[:, :, ::-1]
 
-        batchX[i, :, :, :] = xint8 * np.float32(g_tf_input_scale)
-        batchY[i] = y
+            xint8 = xint8.transpose(1, 2, 0)
 
-        g_lmdb_cursor.next()
+            batchX[i, :, :, :] = xint8 * np.float32(self.g_tf_input_scale)
+            batchY[i] = y
 
-    return (batchX, batchY)
+            self.g_lmdb_cursor.next()
+
+        return (batchX, np.array(batchY, dtype=np.float32))

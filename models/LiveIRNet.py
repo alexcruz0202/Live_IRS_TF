@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras import regularizers
 
 Input = keras.layers.Input
 Model = keras.models.Model
@@ -10,6 +11,7 @@ MaxPooling2D = keras.layers.MaxPooling2D
 Dropout = keras.layers.Dropout
 Flatten = keras.layers.Flatten
 Dense = keras.layers.Dense
+Softmax = keras.layers.Softmax
 
 
 def LiveIRNet(input_shape, input_tensor, output_size):
@@ -40,6 +42,7 @@ def LiveIRNet(input_shape, input_tensor, output_size):
     x = Activation('relu', name='S1_relu_conv6')(x)
     x = Conv2D(32, (3 ,3), strides=(1 ,1), name='S1_conv7', padding='same')(x)
     x = Activation('relu', name='S1_relu_conv7')(x)
+    x = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='S1_pool4')(x)
     x = Flatten(name='S1_flatten')(x)
 
     ## Block 6 ##
@@ -47,6 +50,7 @@ def LiveIRNet(input_shape, input_tensor, output_size):
     x = Dense(128, activation='relu', name='S1_fc1')(x)
     x = Dropout(0.6)(x)
     x = Dense(output_size, activation=None, name='output')(x)
+    x = Softmax()(x)
     model = Model([img_input], x, name='facial_landmark_model')
 
     return model
