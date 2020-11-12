@@ -2,7 +2,7 @@ import os
 import sys
 import numpy as np
 import tensorflow as tf
-from models.LiveIRNet import LiveIRNet_K0
+from models.LiveIRNet_K210 import LiveIRNet_K0
 from datasets.load_lmdb import *
 from tensorflow.keras.optimizers import SGD
 from keras.models import load_model
@@ -10,7 +10,7 @@ from keras.models import load_model
 
 def main():
     model = LiveIRNet_K0(input_shape=INPUT_SHAPE, input_tensor=None, output_size=OUTPUT_SIZE)
-    model.load_weights("E:/Data/AYC/spoofing/live_irs_tf/models/2/328.h5")
+    model.load_weights("./pretrained/LiveIRNet_V0/52.h5")
     print(model.summary())
 
     optimizer = SGD(lr=1e-2, decay=1e-6, momentum=0.9)
@@ -18,17 +18,12 @@ def main():
                   metrics=['accuracy'])
 
     train_lmdb = LMDB()
-    train_lmdb_size = train_lmdb.set_lmdb_info("E:/Data/AYC/spoofing/database/LevelDB/Train_LiveDepth_go_10_20201018-lmdb")
-    #Train_LiveDepth_go_03_20200818-lmdb
+    train_lmdb_size = train_lmdb.set_lmdb_info("E:/Data/HWS/Database/FaceSpoofing/JX-H62/train3d_lmdb_sp_1.04")
     train_step_batch = train_lmdb_size // TRAIN_BATCH_SIZE
 
-    valid_lmdb = LMDB()
-    valid_lmdb_size = valid_lmdb.set_lmdb_info("E:/Data/AYC/spoofing/database/LevelDB/Valid_LiveDepth_go_09_20201017-lmdb")
-    #valid_LiveDepth_go_09_20201017-lmdb
+    valid_lmdb = LMDB(is_test=True)
+    valid_lmdb_size = valid_lmdb.set_lmdb_info("E:/Data/HWS/Database/FaceSpoofing/JX-H62/valid3d_lmdb_sp_1.04")
     valid_step_batch = valid_lmdb_size // VALID_BATCH_SIZE
-
-    val_acc = []
-    val_loss = []
 
     print("training has been prepared.")
     for epoch in range(EPOCH_COUNT):
@@ -67,7 +62,7 @@ def main():
         valid_loss = np.sum(np.asarray(valid_loss)) / valid_step_batch
         print('valid_acc: {0} \t valid_loss: {1} on epoch {2}'.format(valid_acc, valid_loss, epoch))
 
-        model.save("./models/{}.h5".format(epoch))
+        model.save("./ckpt/LiveIRNet_V0/{}.h5".format(epoch))
 
 
 if __name__ == '__main__':

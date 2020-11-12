@@ -7,7 +7,7 @@ from datasets import caffe_pb2
 
 
 class LMDB():
-    def __init__(self):
+    def __init__(self, is_test=False):
         self.CROP_SIZE = 128
         self.CROP_CHANNELS = 1
 
@@ -15,7 +15,7 @@ class LMDB():
         self.g_lmdb_txn = None
         self.g_lmdb_cursor = None
 
-        self.g_rand_generator = random
+        self.is_test = is_test
         self.g_flip_enable = True
         self.g_tf_input_enable = True
         self.g_tf_input_scale = 0.00390625
@@ -67,7 +67,7 @@ class LMDB():
             xint8 = np.fromstring(datum.data, dtype=np.uint8)
             xint8 = xint8.reshape(c, h, w)
 
-            if self.g_rand_generator:
+            if not self.is_test:
                 top = random.randint(0, h - crop_size - 1)
                 left = random.randint(0, w - crop_size - 1)
             else:
